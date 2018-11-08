@@ -1,0 +1,167 @@
+{% extends "layout.html" %} {% block title %}Race{% endblock %}{% block head %}
+<script type="text/javascript" charset="utf-8">
+	$(document).ready(function () {
+		var socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port);
+
+		var buzzer = false;
+
+		$('#voice-calls').val(parseInt(d5rt.primaryPilot));
+
+		socket.on('race_status', function (msg) {
+			switch (msg.race_status) {
+				case 1: // Race running
+					$('body').addClass('race-running');
+					$('body').removeClass('race-stopped');
+					$('body').removeClass('race-new');
+					break;
+				case 2: // Race stopped, clear or save laps
+					$('body').addClass('race-stopped');
+					$('body').removeClass('race-running');
+					$('body').removeClass('race-new');
+					break;
+				default: // Waiting to start new race
+					$('body').addClass('race-new');
+					$('body').removeClass('race-running');
+					$('body').removeClass('race-stopped');
+			}
+		});
+
+		socket.on('current_laps', function (msg) {
+			$.each(msg.node_index, function (i, node_index) { // i is loop num, node_index is json array
+				$('#current_laps_' + i + ' tbody > tr').remove();
+				$.each(node_index.lap_id, function (j, lap_id) { // j is loop num, lap_id is not used
+					if (node_index.lap_id[j] == 0) {
+						var $tr = $('<tr class="lap_0">').append(
+							$('<td>').text(node_index.lap_id[j]),
+							$('<td>').text(node_index.lap_time[j])
+						).appendTo('#current_laps_' + i);
+					}
+					else {
+						var $tr = $('<tr>').append(
+							$('<td>').text(node_index.lap_id[j]),
+							$('<td>').text(node_index.lap_time[j])
+						).appendTo('#current_laps_' + i);
+					}
+				});
+			});
+		});
+
+		socket.on('leaderboard', function (msg) {
+			$('#leaderboard tbody > tr').remove();
+			for (i = 0; i < msg.position.length; i++) {
+				var $tr = $('<tr>').append(
+					$('<td class="pos">').text(msg.position[i]),
+					$('<td class="pilot">').text(msg.callsign[i]),
+					$('<td class="laps">').text(msg.laps[i]),
+					$('<td class="last">').text(msg.last_lap[i]),
+					$('<td class="behind">').text(msg.behind[i]),
+					$('<td class="avg">').text(msg.average_lap[i]),
+					$('<td class="fast">').text(msg.fastest_lap[i]),
+					$('<td class="total">').text(msg.total_time[i]),
+				).appendTo('#leaderboard');
+			}
+		});
+
+		socket.on('phonetic_data', function (msg) {
+			if (d5rt.primaryPilot == 0 || d5rt.primaryPilot == msg.pilot_id) {
+				var $ttstest = msg.pilot + " lap " + msg.lap + ": " + msg.phonetic;
+				speak('<div class="speech">' + $ttstest + '</div>');
+			}
+		})
+
+		socket.on('current_heat', function (msg) {
+			$('.current_heat').html('Heat ' + msg.current_heat);
+			for (i = 0; i < msg.callsign.length; i++) {
+				$('.callsign_' + i).html(msg.callsign[i]);
+			}
+		});
+
+		socket.on('start_timer', function (msg) {
+			if ({{race_format.race_mode}}) {
+				// Count up mode
+				timer.reset(-1); // Stop and reset with -1 seconds to catch buzzer
+			} else {
+				timer.reset({{race_format.race_time_sec+1}});
+				// 0 = Count down mode
+			}
+			timer.mode({{race_format.race_mode}});
+			timer.start(); // Start clock
+		});
+
+		socket.on('stop_timer', function (msg) {
+			timer.stop();
+		});
+
+		$('#voice-calls').change(function(){
+			d5rt.primaryPilot = parseInt($(this).val());
+			d5rt.saveData();
+		});
+	});
+
+	function speak(obj) {
+		$(obj).articulate('setVoice','name', d5rt.language).articulate('speak');
+	};
+
+</script>
+{% endblock %} {% block content %}
+<main class="page-racepublic">
+
+<!--Buttons for controlling the race-->
+<p>{% include "build_timer.html" %}</p>
+
+<h2 class="current_heat">Heat {{ current_heat }}</h2>
+
+<!--Display the race leaderboard-->
+<table class="table" id="leaderboard">
+	<thead>
+		<tr>
+			<th class="pos">Pos.</th>
+			<th class="pilot">Pilot</th>
+			<th class="laps">Laps</th>
+			<th class="last">Last Lap</th>
+			<th class="behind">Behind</th>
+			<th class="avg">Average</th>
+			<th class="fast">Fastest</th>
+			<th class="total">Total</th>
+		</tr>
+	</thead>
+	<tbody>
+	</tbody>
+</table>
+
+<!--Display the current laps-->
+<div class="race-results">
+	{% for node in range(num_nodes) %}
+	<div class="node">
+		<h4 class="callsign_{{ node }}">
+			{{ pilots.query.filter_by( pilot_id=heats.query.filter_by(heat_id=current_heat,node_index=node).first().pilot_id ).first().callsign
+			}}
+		</h4>
+		<div class="channel-block"><span class="ch">{{ channels[node] }}</span> <span class="fr">{{ frequencies[node] }}</span></div>
+		<table class="laps" id="current_laps_{{ node }}">
+			<tbody>
+			</tbody>
+		</table>
+	</div>
+	{% endfor %}
+</div>
+
+<!--Voice Settings (page-local)-->
+<div class="voice-settings">
+	<ol class="form">
+		<li>
+			<div class="label-block">
+				<label for="voice-calls">Voice Calls</label>
+			</div>
+			<select id="voice-calls">
+				<option value="-1">None</option>
+				<option value="0">All</option>
+				{% for pilot in pilots.query.order_by(pilots.name).all() %} {% if pilot.pilot_id != 0 %}
+					<option value="{{ pilot.pilot_id }}">{{ pilot.callsign }} ({{ pilot.name }})</option>
+				{% endif %} {% endfor %}
+			</select>
+		</li>
+	</ol>
+</div>
+</main>
+{% endblock %}

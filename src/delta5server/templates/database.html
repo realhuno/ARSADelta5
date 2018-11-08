@@ -1,0 +1,166 @@
+{% extends "layout.html" %} {% block title %}Database{% endblock %} {% block content %}
+<main class="page-database">
+<h2>Pilots</h2>
+<table class="table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Pilot ID</th>
+            <th>Call Sign</th>
+            <th>Name</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for pilot in pilots.query.all() %}
+        <tr>
+            <td>{{ pilot.id }}</td>
+            <td>{{ pilot.pilot_id }}</td>
+            <td>{{ pilot.callsign }}</td>
+            <td>{{ pilot.name }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>Heats</h2>
+<table class="table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Heat ID</th>
+            <th>Node Index</th>
+            <th>Pilot ID</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for heat in heats.query.all() %}
+        <tr>
+            <td>{{ heat.id }}</td>
+            <td>{{ heat.heat_id }}</td>
+            <td>{{ heat.node_index }}</td>
+            <td>{{ heat.pilot_id }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>Current Laps</h2>
+<table class="table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Node Index</th>
+            <th>Pilot ID</th>
+            <th>Lap ID</th>
+            <th>Lap Time Stamp</th>
+            <th>Lap Time</th>
+            <th>Lap Time Formatted</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for currentlap in currentlaps.query.all() %}
+        <tr>
+            <td>{{ currentlap.id }}</td>
+            <td>{{ currentlap.node_index }}</td>
+            <td>{{ currentlap.pilot_id }}</td>
+            <td>{{ currentlap.lap_id }}</td>
+            <td>{{ currentlap.lap_time_stamp }}</td>
+            <td>{{ currentlap.lap_time }}</td>
+            <td>{{ currentlap.lap_time_formatted }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>Saved Races</h2>
+<table class="table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Round ID</th>
+            <th>Heat ID</th>
+            <th>Node Index</th>
+            <th>Pilot ID</th>
+            <th>Lap ID</th>
+            <th>Lap Time Stamp</th>
+            <th>Lap Time</th>
+            <th>Lap Time Formatted</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for savedrace in savedraces.query.all() %}
+        <tr>
+            <td>{{ savedrace.id }}</td>
+            <td>{{ savedrace.round_id }}</td>
+            <td>{{ savedrace.heat_id }}</td>
+            <td>{{ savedrace.node_index }}</td>
+            <td>{{ savedrace.pilot_id }}</td>
+            <td>{{ savedrace.lap_id }}</td>
+            <td>{{ savedrace.lap_time_stamp }}</td>
+            <td>{{ savedrace.lap_time }}</td>
+            <td>{{ savedrace.lap_time_formatted }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>Frequencies</h2>
+<table class="table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Band</th>
+            <th>Channel</th>
+            <th>Frequency</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for frequency in frequencies.query.all() %}
+        <tr>
+            <td>{{ frequency.id }}</td>
+            <td>{{ frequency.band }}</td>
+            <td>{{ frequency.channel }}</td>
+            <td>{{ frequency.frequency }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>Race Format</h2>
+<table class="table">
+    <tbody>
+        <tr>
+            <th>Mode</th>
+            <td>{{ race_format.race_mode }}</td>
+        </tr>
+        <tr>
+            <th>Fixed Time</th>
+            <td>{{ race_format.race_time_sec }}</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Node Data</h2>
+<table class="table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Frequency</th>
+            <th>Offset</th>
+            <th>Scale</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for node in node_data.query.all() %}
+        <tr>
+            <td>{{ node.id }}</td>
+            <td>{{ node.frequency }}</td>
+            <td>{{ node.offset }}</td>
+            <td>{{ node.scale }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+</main>
+{% endblock %}

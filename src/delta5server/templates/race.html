@@ -1,0 +1,294 @@
+{% extends "layout.html" %} {% block title %}Run{% endblock %}{% block head %}
+<audio id="buzzer" src="./static/audio/%%.mp3" type="audio/mp3"></audio>
+
+<script type="text/javascript" charset="utf-8">
+	$(document).ready(function () {
+		var socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port);
+
+		// set admin flag
+		d5rt.admin = true;
+		d5rt.saveData();
+		$('nav li').removeClass('admin-hide');
+
+		// set up RSSI graphing
+		$('.node .race-header').each(function(){
+			var node = $(this);
+			var node_id = parseInt(node.find('button').attr('data-node'));
+			node.before('<div class="rssi-graph"><canvas id="rssi-graph-' + node_id + '"></div>');
+
+			d5rt.nodes[node_id] = new nodeModel();
+			d5rt.nodes[node_id].setup(document.getElementById('rssi-graph-' + node_id));
+		});
+
+		socket.on('race_status', function (msg) {
+			switch (msg.race_status) {
+				case 1: // Race running
+					$('button#current_heat').attr('disabled', 'disabled');
+					$('button#start_race').attr('disabled', 'disabled');
+					$('button#stop_race').removeAttr('disabled');
+					$('button#save_laps').attr('disabled', 'disabled');
+					$('button#clear_laps').attr('disabled', 'disabled');
+					$('button.simulate_lap').removeAttr('disabled');
+					$('body').addClass('race-running');
+					$('body').removeClass('race-stopped');
+					$('body').removeClass('race-new');
+					break;
+				case 2: // Race stopped, clear or save laps
+					$('button#current_heat').attr('disabled', 'disabled');
+					$('button#start_race').attr('disabled', 'disabled');
+					$('button#stop_race').attr('disabled', 'disabled');
+					$('button#save_laps').removeAttr('disabled');
+					$('button#clear_laps').removeAttr('disabled');
+					$('button.simulate_lap').attr('disabled', 'disabled');
+					$('body').addClass('race-stopped');
+					$('body').removeClass('race-running');
+					$('body').removeClass('race-new');
+					break;
+				default: // Waiting to start new race
+					$('button#current_heat').removeAttr('disabled');
+					$('button#start_race').removeAttr('disabled');
+					$('button#stop_race').attr('disabled', 'disabled');
+					$('button#save_laps').attr('disabled', 'disabled');
+					$('button#clear_laps').attr('disabled', 'disabled');
+					$('button.simulate_lap').attr('disabled', 'disabled');
+					$('body').addClass('race-new');
+					$('body').removeClass('race-running');
+					$('body').removeClass('race-stopped');
+			}
+		});
+
+		socket.on('heartbeat', function (msg) {
+			for (i = 0; i < msg.current_rssi.length; i++) {
+				var rssiValue = msg.current_rssi[i] - d5rt.nodes[i].offset;
+
+				$('.current_rssi_' + i).html(rssiValue);
+
+				if (d5rt.nodes[i].graph.options.maxValue < rssiValue ||
+					d5rt.rssiMax < rssiValue) {
+					d5rt.nodes[i].graph.options.maxValue = rssiValue;
+					for (var j in d5rt.nodes) {
+						d5rt.nodes[j].graph.options.maxValue = d5rt.rssiMax = rssiValue;
+					}
+				}
+
+				d5rt.nodes[i].series.append(new Date().getTime(), rssiValue);
+			}
+		});
+
+		socket.on('node_data', function (msg) {
+			for (i = 0; i < msg.frequency.length; i++) {
+				$('.trigger_rssi_' + i).html(msg.trigger_rssi[i]);
+				$('.peak_rssi_' + i).html(msg.peak_rssi[i]);
+
+				d5rt.nodes[i].trigger_rssi = msg.trigger_rssi[i];
+				d5rt.nodes[i].peak_rssi = msg.peak_rssi[i];
+				// import calibration/trigger threshold lines?
+				d5rt.nodes[i].offset = msg.node_offset[i];
+
+				d5rt.nodes[i].updateThresholds();
+			}
+		});
+
+		socket.on('current_laps', function (msg) {
+			$.each(msg.node_index, function (i, node_index) { // i is loop num, node_index is json array
+				$('#current_laps_' + i + ' tbody > tr').remove();
+				$.each(node_index.lap_id, function (j, lap_id) { // j is loop num, lap_id is not used
+					// No lap deletion for first lap
+					if (node_index.lap_id[j] == 0) {
+						var $tr = $('<tr class="lap_0">').append(
+							// $('<td>').text(node_index.lap_id[j]), // trim for better small UI (can't adjust colspan in CSS)
+							$('<td colspan="2">').text(node_index.lap_time[j])
+						).appendTo('#current_laps_' + i);
+					}
+					else {
+						var $tr = $('<tr>').append(
+							// $('<td>').text(node_index.lap_id[j]), // trim for better small UI (can't adjust colspan in CSS)
+							$('<td colspan="2">').text(node_index.lap_time[j] + ' ').append(
+								$('<button type="button" class="delete_lap btn-danger" data-node="' + i + '" data-lapid="' + node_index.lap_id[j] + '" onclick="this.blur();">&#215;</button>')
+							)
+						).appendTo('#current_laps_' + i);
+					}
+
+				});
+			});
+			// buzzer.play(); // Play buzzer on new lap but not on page load?
+		});
+
+		socket.on('leaderboard', function (msg) {
+			$('#leaderboard tbody > tr').remove();
+			for (i = 0; i < msg.position.length; i++) {
+				var $tr = $('<tr>').append(
+					$('<td class="pos">').text(msg.position[i]),
+					$('<td class="pilot">').text(msg.callsign[i]),
+					$('<td class="laps">').text(msg.laps[i]),
+					$('<td class="last">').text(msg.last_lap[i]),
+					$('<td class="behind">').text(msg.behind[i]),
+					$('<td class="avg">').text(msg.average_lap[i]),
+					$('<td class="fast">').text(msg.fastest_lap[i]),
+					$('<td class="total">').text(msg.total_time[i]),
+				).appendTo('#leaderboard');
+			}
+		});
+
+		socket.on('phonetic_data', function (msg) {
+			var $ttstest = msg.pilot + " lap " + msg.lap + ": " + msg.phonetic;
+			speak('<div class="speech">' + $ttstest + '</div>');
+		})
+		
+		socket.on('speak_phonetic_text', function (msg) {
+			var $ttstest = msg.text;
+			speak('<div class="speech">' + $ttstest + '</div>');
+		})
+		
+
+		socket.on('current_heat', function (msg) {
+			$('.current_heat').html('Heat ' + msg.current_heat);
+			for (i = 0; i < msg.callsign.length; i++) {
+				$('.callsign_' + i).html(msg.callsign[i]);
+			}
+		});
+
+		socket.on('start_timer', function (msg) {
+			if ({{race_format.race_mode}}) {
+				// Count up mode
+				timer.reset(-1); // Stop and reset with -1 seconds to catch buzzer
+			} else {
+				timer.reset({{race_format.race_time_sec+1}});
+				// 0 = Count down mode
+			}
+			timer.mode({{race_format.race_mode}});
+			timer.start(); // Start clock
+			
+			//speak('<div class="speech">Pilot 1 go</div>');
+			
+			
+		});
+
+		socket.on('stop_timer', function (msg) {
+			timer.stop();
+		});
+
+		$('button#start_race').click(function (event) {
+			socket.emit('start_race');
+			return false;
+		});
+
+		$('button#stop_race').click(function (event) {
+			socket.emit('stop_race');
+			return false;
+		});
+
+		$('button#save_laps').click(function (event) {
+			socket.emit('save_laps');
+			return false;
+		});
+
+		$('button#clear_laps').click(function (event) {
+			socket.emit('clear_laps');
+			return false;
+		});
+
+		$('button.simulate_lap').click(function (event) {
+			var data = {
+				node: parseInt($(this).data('node')),
+			};
+			socket.emit('simulate_lap', data);
+			return false;
+		});
+
+		$(document).on("click", ".delete_lap", function (event) { // Needed for buttons added after document load
+			var data = {
+				node: parseInt($(this).data('node')),
+				lapid: parseInt($(this).data('lapid')),
+			};
+			socket.emit('delete_lap', data);
+			return false;
+		});
+
+		$('#set_current_heat').change(function (event) {
+			var data = {
+				heat: parseInt($(this).val()),
+			};
+			socket.emit('set_current_heat', data);
+		});
+
+	});
+
+	function speak(obj) {
+		$(obj).articulate('setVoice','name', d5rt.language).articulate('speak');
+	};
+
+</script>
+{% endblock %} {% block content %}
+<main class="page-race">
+<div class="timer">
+	{% include "build_timer.html" %}
+</div>
+
+<!--Buttons for controlling the race-->
+<div class="control-set">
+	<label for="set_current_heat" class="screen-reader-text">Current Heat</label>
+	<select id="set_current_heat">
+		{% for heat in heats.query.with_entities(heats.heat_id).distinct() %}
+		<option value="{{ heat.heat_id }}" {% if heat.heat_id|int() == current_heat|int() %}
+				selected="selected"
+			{% endif %}>
+			Heat {{ heat.heat_id }}
+		</option>
+		{% endfor %}
+	</select>
+	<button type="button" id="start_race" onclick="this.blur();">Start Race</button>
+	<button type="button" id="stop_race" disabled="disabled" onclick="this.blur();">Stop Race</button>
+	<button type="button" id="save_laps" disabled="disabled" onclick="this.blur();">Save Laps</button>
+	<button type="button" id="clear_laps" disabled="disabled" onclick="this.blur();">Clear Laps</button>
+</div>
+
+<!--Display the race leaderboard-->
+<table id="leaderboard">
+	<thead>
+		<tr>
+			<th class="pos">Pos.</th>
+			<th class="pilot">Pilot</th>
+			<th class="laps">Laps</th>
+			<th class="last">Last Lap</th>
+			<th class="behind">Behind</th>
+			<th class="avg">Average</th>
+			<th class="fast">Fastest</th>
+			<th class="total">Total</th>
+		</tr>
+	</thead>
+	<tbody>
+	</tbody>
+</table>
+
+<!--Display the current laps-->
+<div class="race-results">
+	{% for node in range(num_nodes) %}
+	<div class="node">
+		<h4 class="callsign_{{ node }}">
+			{{ pilots.query.filter_by( pilot_id=heats.query.filter_by(heat_id=current_heat,node_index=node).first().pilot_id ).first().callsign
+			}}
+		</h4>
+		<div class="race-header">
+			<div class="channel-block"><span class="ch">{{ channels[node] }}</span> <span class="fr">{{ frequencies[node] }}</span></div>
+			<button type="button" class="simulate_lap" data-node="{{ node }}" onclick="this.blur();">Manual</button>
+		</div>
+		<table class="laps" id="current_laps_{{ node }}">
+			<thead>
+				<tr>
+					<td class="rssi" colspan="2">
+						<span class="current_rssi_{{ node }}"></span> /
+						<span class="trigger_rssi_{{ node }}"></span> /
+						<span class="peak_rssi_{{ node }}"></span>
+					</td>
+				</tr>
+			</thead>
+			<tbody>
+			</tbody>
+		</table>
+	</div>
+	{% endfor %}
+</div>
+
+</main>
+{% endblock %}

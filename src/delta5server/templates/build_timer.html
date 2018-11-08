@@ -1,0 +1,138 @@
+<script>
+	function _timer(callback) {
+		var time = 0; // The default time in seconds
+		var mode = 1; // Count down is 0, count up is 1
+		var status = 0; // Stopped is 0, running is 1
+		var timer_id; // Used by setInterval function
+
+		var buzzer = $('buzzer')[0]; // Buzzer audio tag is loaded on race page already
+
+		// Start the timer
+		this.start = function () {
+			status = 1; // Set status to running
+			timer_id = setInterval(function () {
+				switch (mode) {
+					default: // Default mode 0 for a countdown timer
+						time--;
+						break;
+					case 1: // Mode 1 for a count up timer
+						time++;
+						break;
+				}
+				generateTime(); // Updates html timer text
+				if (typeof (callback) === 'function') callback(time);
+			}, 1000); // 1000 ms update rate
+		}
+
+		// Stop timer and clear update interval
+		this.stop = function () {
+			status = 0;
+			clearInterval(timer_id);
+		}
+
+		// Stop the timer, set the time equal to the passed value, update html clock
+		this.reset = function (reset_time) {
+			this.stop(); // On a reset also stop the clock
+			reset_time = (typeof (reset_time) !== 'undefined') ? reset_time : 0;
+			time = reset_time;
+			generateTime(time);
+		}
+
+		// Change the mode
+		this.mode = function (new_mode) {
+			mode = new_mode;
+		}
+
+		// Return the current time in seconds
+		this.getTime = function () {
+			return time;
+		}
+
+		// Return the current mode
+		this.getMode = function () {
+			return mode;
+		}
+
+		// Return the current status
+		this.getStatus = function () {
+			return status;
+		}
+
+		// This methode will render the time variable to minute:second format
+		function generateTime() {
+			var second = time % 60;
+			var minute = Math.floor(time / 60);
+
+			second = (second < 10) ? '0' + second : second; // Pad zero if under 10
+			minute = (minute < 10) ? '0' + minute : minute;
+
+			if (time < 0) {
+				second = '--';
+				minute = '--';
+			}
+
+			$('.timer_sec').html(second);
+			$('.timer_min').html(minute);
+		}
+	}
+
+	// Create the timer object
+	var timer;
+	timer = new _timer(
+		function (time) {
+			if (timer.getMode() == 0) { // Count down clock
+				if (time == 0) {
+					buzzer.play();
+					timer.stop();
+				} // End up race buzzer
+
+				if (time == 10) {
+					speak('<div class="timer">10 seconds</div>');
+				}
+
+				if (time == 5) {
+					speak('<div class="timer">5 seconds</div>');
+				}
+
+				if (time == {{race_format.race_time_sec}}) { buzzer.play(); } // Start buzzer
+			}
+
+			if (timer.getMode() == 1) { // Count up clock
+				if (time == 0) {
+				speak('<div class="timer">Pilots arm your quads</div>');
+				
+					//buzzer.play();
+				} // Start buzzer
+				if (time == 4) {
+				speak('<div class="timer">Pilot 1 go</div>');
+				} // 2 min call out
+						if (time == 6) {
+				speak('<div class="timer">Pilot 2 go</div>');
+				} // 2 min call out
+						if (time == 8) {
+				speak('<div class="timer">Pilot 3 go</div>');
+				} // 2 min call out
+								if (time == 10) {
+				speak('<div class="timer">Pilot 4 go</div>');
+				} // 2 min call out
+			}
+
+			if (time == 30) {
+				//speak('<div class="timer">hallo</div>');
+			} // 30 second call out
+
+			if (time == 60) {
+				
+			} // 1 min call out
+		}
+	);
+
+	timer.reset({{race_format.race_time_sec}});
+	timer.mode(0); // Set initial mode
+
+</script>
+
+<!--Timer html-->
+<div class="timing-clock">
+	<span class="timer_min">00</span>:<span class="timer_sec">00</span>
+</div>

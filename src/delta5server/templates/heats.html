@@ -1,0 +1,41 @@
+{% extends "layout.html" %} {% block title %}Heats{% endblock %} {% block head %} {% endblock %} {% block content %}
+<main class="page-heats">
+
+<!--Display the heats-->
+
+<h2>Heats</h2>
+<ol class="heats">
+	{% for heat in heats.query.with_entities(heats.heat_id).distinct().order_by(heats.heat_id) %}
+	<li class="heat">
+		<h3>Heat {{ heat.heat_id }}</h3>
+		<ol>
+			{% for node in range(num_nodes) %}
+			<li>
+				<div class="channel-block"><span class="ch">{{ channels[node] }}</span> <span class="fr">{{ frequencies[node] }}</span></div>
+
+				<div class="pilot-name">{{ pilots.query.filter_by(pilot_id= heats.query.filter_by(heat_id=heat.heat_id,node_index=node).first().pilot_id ).first().callsign
+					}}</div>
+			</li>
+			{% endfor %}
+		</ol>
+	</li>
+	{% endfor %}
+</ol>
+
+<!--Display the pilots-->
+<h2>Pilots</h2>
+<ul class="pilots">
+	{% for pilot in pilots.query.order_by(pilots.callsign).all() %} {% if pilot.pilot_id != 0 %}
+	<li>
+		<div class="callsign">{{ pilot.callsign }}</div>
+		<div class="name">{{ pilot.name }}</div>
+	</li>
+	{% endif %} {% endfor %}
+</ul>
+
+<div class="admin">
+	<p><a href="/settings">Admin</a></p>
+</div>
+
+</main>
+{% endblock %}
