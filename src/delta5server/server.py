@@ -772,8 +772,7 @@ def emit_leaderboard():
         if max_laps[node] is 0:
             total_time.append(0) # Add zero if no laps completed
         else:
-            total_time.append(CurrentLap.query.filter_by(node_index=node, \
-			    lap_id=max_laps[node]).first().lap_time_stamp)
+    	    total_time.append(CurrentLap.query.filter_by(node_index=node, lap_id=max_laps[node]).first().lap_time_stamp)
     # Get the last lap for each pilot
     last_lap = []
     for node in range(RACE.num_nodes):
@@ -788,7 +787,7 @@ def emit_leaderboard():
         if max_laps[node] is 0:
             average_lap.append(0) # Add zero if no laps completed
         else:
-            avg_lap = DB.session.query(DB.func.avg(CurrentLap.lap_time)) \
+            avg_lap = DB.session.query(DB.func.sum(CurrentLap.lap_time)) \
                 .filter(CurrentLap.node_index == node, CurrentLap.lap_id != 0).scalar()
             average_lap.append(avg_lap)
     # Get the fastest lap time for each pilot
@@ -809,7 +808,7 @@ def emit_leaderboard():
     # Combine for sorting
     leaderboard = zip(callsigns, max_laps, total_time, last_lap, average_lap, fastest_lap)
     # Reverse sort max_laps x[1], then sort on total time x[2]
-    leaderboard_sorted = sorted(leaderboard, key = lambda x: (-x[1], x[2]))
+    leaderboard_sorted = sorted(leaderboard, key = lambda x: (-x[1], x[4]))
 
     SOCKET_IO.emit('leaderboard', {
         'position': [i+1 for i in range(RACE.num_nodes)],
